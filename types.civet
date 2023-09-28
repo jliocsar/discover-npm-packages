@@ -1,0 +1,5 @@
+export type TPackageNode
+  name: string
+  url: string
+  downloads: number
+  children?: TPackageNode[]
