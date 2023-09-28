@@ -1,9 +1,10 @@
-{ argv } from node:process
+{ argv, exit } from node:process
 { fetch } from undici
 pino from pino
 pretty from pino-pretty
 minimist from minimist
 type { TPackageNode } from ./types.civet
+{ curry, ascByDownloads } from ./utils.civet
 
 NPM_REGISTRY_URL := 'https://registry.npmjs.org'
 NPM_DOWNLOADS_API_URL := 'https://api.npmjs.org/downloads/point/last-month'
@@ -12,25 +13,21 @@ HARD_CRAWL_LIMIT := 5
 
 logger := pino pretty colorize: true, singleLine: true
 
-{ _: packages, crawl } := minimist argv.slice(2), alias: { c: 'crawl' }
-crawlLimit .= crawl ?? 2
+{ _: packages, crawl: crawlCount } := minimist argv.slice(2), alias: { c: 'crawl' }
+crawlLimit .= crawlCount ?? 2
 
 if crawlLimit > HARD_CRAWL_LIMIT
-  logger.warn `Crawl limit is too high, setting to ${HARD_CRAWL_LIMIT}`
-  crawlLimit = HARD_CRAWL_LIMIT
+  logger.warn `Crawl limit is too high! Max. is ${HARD_CRAWL_LIMIT}`
+  exit 1
 
 logger.info `Running for ${packages.length} packages, using crawl limit of ${crawlLimit}`
 
 findNpmPackage := (pkg: string) ->
   fetch `${NPM_REGISTRY_URL}/${pkg}/latest` |> await |> .json()
-
 findNpmPackagesDownloads := (pkg: string): Promise<any> ->
   fetch `${NPM_DOWNLOADS_API_URL}/${pkg}` |> await |> .json()
 
-byDownloads := (orig: TPackageNode, comp: TPackageNode) ->
-  comp.downloads - orig.downloads
-
-transverse := (crawls = 0) -> (pkgs: string[]): Promise<TPackageNode[]> ->
+crawl := curry (crawls = 0, pkgs: string[]) ->
   await.all
     for pkg of pkgs
       { downloads } := await findNpmPackagesDownloads pkg
@@ -44,16 +41,16 @@ transverse := (crawls = 0) -> (pkgs: string[]): Promise<TPackageNode[]> ->
           |> await
           |> (item: any) => Object.assign {}, item.dependencies, item.devDependencies, item.peerDependencies
           |> Object.keys
-          |> transverse crawls + 1
+          |> crawl crawls + 1
           |> await
-        Object.assign node, children: children.sort byDownloads
+        Object.assign node, children: children.sort ascByDownloads
       logger.info node
       node as TPackageNode
-  .sort byDownloads
+  .sort ascByDownloads
 
 main := ->
   packages
-    |> transverse()
+    |> crawl()
     |> await
     |> (data) => Bun.write 'output.json', JSON.stringify(data, null, 2)
 
