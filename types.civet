@@ -1,5 +1,18 @@
+type TDeps =
+  [dep: string]: string
+
+export type TPackage
+  description: string
+  dependencies: TDeps
+  devDependencies: TDeps
+  peerDependencies: TDeps
+  repository:
+    url: string
+
 export type TPackageNode
   name: string
+  description: string
   url: string
   downloads: number
+  readmePreview?: string
   children?: TPackageNode[]

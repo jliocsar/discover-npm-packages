@@ -3,55 +3,78 @@
 pino from pino
 pretty from pino-pretty
 minimist from minimist
-type { TPackageNode } from ./types.civet
-{ curry, ascByDownloads } from ./utils.civet
+removeMd from remove-markdown
+{ Octokit } from octokit
+type { TPackageNode, TPackage } from ./types.civet
+{ curry, curryinv, ascByDownloads } from ./utils.civet
 
 NPM_REGISTRY_URL := 'https://registry.npmjs.org'
 NPM_DOWNLOADS_API_URL := 'https://api.npmjs.org/downloads/point/last-month'
 NPM_PACKAGE_URL := 'https://www.npmjs.com/package'
 HARD_CRAWL_LIMIT := 5
 
+octokit := new Octokit auth: process.env.GITHUB_PERSONAL_ACCESS_TOKEN!
 logger := pino pretty colorize: true, singleLine: true
 
-{ _: packages, crawl: crawlCount } := minimist argv.slice(2), alias: { c: 'crawl' }
-crawlLimit .= crawlCount ?? 2
+{ _: packages, crawl: crawlCount } := minimist argv.slice(2), alias: { c: 'crawl' }, default: { crawl: 2 }
+adjustedCrawlCount .= crawlCount
 
-if crawlLimit > HARD_CRAWL_LIMIT
+if adjustedCrawlCount > HARD_CRAWL_LIMIT
   logger.warn `Crawl limit is too high! Max. is ${HARD_CRAWL_LIMIT}`
   exit 1
 
-logger.info `Running for ${packages.length} packages, using crawl limit of ${crawlLimit}`
+logger.info `Running for ${packages.length} packages, using crawl limit of ${adjustedCrawlCount}`
 
-findNpmPackage := (pkg: string) ->
+getNpmPackage := (pkg: string) ->
   fetch `${NPM_REGISTRY_URL}/${pkg}/latest` |> await |> .json()
-findNpmPackagesDownloads := (pkg: string): Promise<any> ->
+getNpmPackagesDownloads := (pkg: string) ->
   fetch `${NPM_DOWNLOADS_API_URL}/${pkg}` |> await |> .json()
+getReadme := (owner: string, repo: string) =>
+  octokit.rest.repos.getReadme { owner, repo }
+  |> await
+  |> .data
+  |> .content
+  |> curryinv(Buffer.from) 'base64'
+  |> .toString()
 
 crawl := curry (crawls = 0, pkgs: string[]) ->
   await.all
     for pkg of pkgs
-      { downloads } := await findNpmPackagesDownloads pkg
-      node: Partial<TPackageNode> .= {
+      npmPkg := (await getNpmPackage pkg) as TPackage
+      { downloads } := (await getNpmPackagesDownloads pkg) as { downloads: number }
+      node : TPackageNode := {
         downloads,
         name: pkg,
+        description: npmPkg.description,
         url: NPM_PACKAGE_URL + '/' + pkg,
       }
-      if crawls is not crawlLimit
-        children := findNpmPackage pkg
+      isGithub := if 'repository' in npmPkg then
+        /^git:\/\/github\.com/.test npmPkg.repository.url
+      if isGithub
+        [owner, repo] := npmPkg.repository.url
+          |> .replace /^git:\/\/github\.com\//, ''
+          |> .replace /\.git$/, ''
+          |> .split '/'
+        node.readmePreview = getReadme owner, repo
           |> await
-          |> (item: any) => Object.assign {}, item.dependencies, item.devDependencies, item.peerDependencies
+          |> removeMd
+          |> .slice 0, 1000
+          |> & + '...'
+      unless crawls is adjustedCrawlCount
+        node.children = Object.assign {}, npmPkg.dependencies, npmPkg.devDependencies, npmPkg.peerDependencies
           |> Object.keys
           |> crawl crawls + 1
           |> await
-        Object.assign node, children: children.sort ascByDownloads
+          |> .sort ascByDownloads
       logger.info node
       node as TPackageNode
-  .sort ascByDownloads
 
 main := ->
   packages
     |> crawl()
     |> await
-    |> (data) => Bun.write 'output.json', JSON.stringify(data, null, 2)
+    |> (data) -> Bun.write
+      'output.json'
+      JSON.stringify data, null, 2
 
 await main()
