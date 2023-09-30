@@ -6,7 +6,7 @@ minimist from minimist
 removeMd from remove-markdown
 { Octokit } from octokit
 type { TPackageNode, TPackage } from ./types.civet
-{ curry, curryinv, ascByDownloads } from ./utils.civet
+{ curry, ascByDownloads } from ./utils.civet
 
 NPM_REGISTRY_URL := 'https://registry.npmjs.org'
 NPM_DOWNLOADS_API_URL := 'https://api.npmjs.org/downloads/point/last-month'
@@ -29,13 +29,25 @@ getNpmPackage := (pkg: string) ->
   fetch `${NPM_REGISTRY_URL}/${pkg}/latest` |> await |> .json()
 getNpmPackagesDownloads := (pkg: string) ->
   fetch `${NPM_DOWNLOADS_API_URL}/${pkg}` |> await |> .json()
-getReadme := (owner: string, repo: string) =>
+getReadme := (owner: string, repo: string) ->
   octokit.rest.repos.getReadme { owner, repo }
-  |> await
-  |> .data
-  |> .content
-  |> curryinv(Buffer.from) 'base64'
-  |> .toString()
+    |> await
+    |> .data.content
+    |> (content: string) -> Buffer.from content, 'base64'
+    |> .toString()
+getReadmePreview := (repositoryUrl: string) ->
+  [owner, repo] := repositoryUrl
+    |> .replace /^git:\/\/github\.com\//, ''
+    |> .replace /\.git$/, ''
+    |> .split '/'
+  getReadme owner, repo
+    |> await
+    |> removeMd
+    |> .slice 0, 1000
+    |> & + '...'
+
+isGithub := (npmPkg: TPackage) -> 'repository' in npmPkg
+  and /^git:\/\/github\.com/.test npmPkg.repository.url
 
 crawl := curry (crawls = 0, pkgs: string[]) ->
   await.all
@@ -43,23 +55,13 @@ crawl := curry (crawls = 0, pkgs: string[]) ->
       npmPkg := (await getNpmPackage pkg) as TPackage
       { downloads } := (await getNpmPackagesDownloads pkg) as { downloads: number }
       node : TPackageNode := {
-        downloads,
-        name: pkg,
-        description: npmPkg.description,
-        url: NPM_PACKAGE_URL + '/' + pkg,
+        downloads
+        name: pkg
+        description: npmPkg.description
+        url: NPM_PACKAGE_URL + '/' + pkg
+        readmePreview: if isGithub npmPkg then
+          await getReadmePreview npmPkg.repository.url
       }
-      isGithub := if 'repository' in npmPkg then
-        /^git:\/\/github\.com/.test npmPkg.repository.url
-      if isGithub
-        [owner, repo] := npmPkg.repository.url
-          |> .replace /^git:\/\/github\.com\//, ''
-          |> .replace /\.git$/, ''
-          |> .split '/'
-        node.readmePreview = getReadme owner, repo
-          |> await
-          |> removeMd
-          |> .slice 0, 1000
-          |> & + '...'
       unless crawls is adjustedCrawlCount
         node.children = Object.assign {}, npmPkg.dependencies, npmPkg.devDependencies, npmPkg.peerDependencies
           |> Object.keys

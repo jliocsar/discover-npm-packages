@@ -1,4 +1,4 @@
-type TDeps =
+type TDeps
   [dep: string]: string
 
 export type TPackage
