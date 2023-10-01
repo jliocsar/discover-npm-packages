@@ -9,6 +9,9 @@ export type TPackage
   repository:
     url: string
 
+export type TPackageDownloads
+  downloads: number
+
 export type TPackageNode
   name: string
   description: string

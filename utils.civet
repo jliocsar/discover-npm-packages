@@ -1,7 +1,13 @@
 type { TPackageNode } from ./types.civet
 
+export function ascByDownloads(orig: TPackageNode, comp: TPackageNode)
+  comp.downloads - orig.downloads
+
 export function curry(fn: (a0?: any, a1?: any) -> any)
   (a0?: any) -> (a1?: any) -> fn a0, a1
 
-export function ascByDownloads(orig: TPackageNode, comp: TPackageNode)
-  comp.downloads - orig.downloads
+export function buildUrl(base: string, path: string)
+  new URL path, base |> .href
+
+export writeJson := curry (fileName = 'output.json', data: TPackageNode[]) ->
+  Bun.write fileName, JSON.stringify data, null, 2
