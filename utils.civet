@@ -1,6 +1,7 @@
 type { TPackageNode } from ./types.civet
 
-export curry := (fn: (a0?: any, a1?: any) -> any) -> (a0?: any) -> (a1?: any) -> fn a0, a1
+export function curry(fn: (a0?: any, a1?: any) -> any)
+  (a0?: any) -> (a1?: any) -> fn a0, a1
 
-export ascByDownloads := (orig: TPackageNode, comp: TPackageNode) ->
+export function ascByDownloads(orig: TPackageNode, comp: TPackageNode)
   comp.downloads - orig.downloads

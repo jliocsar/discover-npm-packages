@@ -14,7 +14,7 @@ NPM_PACKAGE_URL := 'https://www.npmjs.com/package'
 HARD_CRAWL_LIMIT := 5
 
 octokit := new Octokit auth: process.env.GITHUB_PERSONAL_ACCESS_TOKEN!
-logger := pino pretty colorize: true, singleLine: true
+logger := pino pretty { +colorize, +singleLine }
 
 { _: packages, crawl: crawlCount } := minimist argv.slice(2), alias: { c: 'crawl' }, default: { crawl: 2 }
 adjustedCrawlCount .= crawlCount
@@ -25,17 +25,22 @@ if adjustedCrawlCount > HARD_CRAWL_LIMIT
 
 logger.info `Running for ${packages.length} packages, using crawl limit of ${adjustedCrawlCount}`
 
-getNpmPackage := (pkg: string) ->
+function getNpmPackage(pkg: string)
   fetch `${NPM_REGISTRY_URL}/${pkg}/latest` |> await |> .json()
-getNpmPackagesDownloads := (pkg: string) ->
+
+function getNpmPackagesDownloads(pkg: string)
   fetch `${NPM_DOWNLOADS_API_URL}/${pkg}` |> await |> .json()
-getReadme := (owner: string, repo: string) ->
+
+operator fromBufferOf := Buffer.from
+
+function getReadme(owner: string, repo: string)
   octokit.rest.repos.getReadme { owner, repo }
     |> await
     |> .data.content
-    |> (content: string) -> Buffer.from content, 'base64'
+    |> & fromBufferOf 'base64'
     |> .toString()
-getReadmePreview := (repositoryUrl: string) ->
+
+function getReadmePreview(repositoryUrl: string)
   [owner, repo] := repositoryUrl
     |> .replace /^git:\/\/github\.com\//, ''
     |> .replace /\.git$/, ''
@@ -46,18 +51,18 @@ getReadmePreview := (repositoryUrl: string) ->
     |> .slice 0, 1000
     |> & + '...'
 
-isGithub := (npmPkg: TPackage) -> 'repository' in npmPkg
-  and /^git:\/\/github\.com/.test npmPkg.repository.url
+function isGithub(npmPkg: TPackage)
+  'repository' in npmPkg and /^git:\/\/github\.com/.test npmPkg.repository.url
 
 crawl := curry (crawls = 0, pkgs: string[]) ->
   await.all
     for pkg of pkgs
       npmPkg := (await getNpmPackage pkg) as TPackage
-      { downloads } := (await getNpmPackagesDownloads pkg) as { downloads: number }
+      npmPkgLastMonthDownloads := (await getNpmPackagesDownloads pkg) as { downloads: number }
       node : TPackageNode := {
-        downloads
+        npmPkgLastMonthDownloads{downloads}
+        npmPkg{description}
         name: pkg
-        description: npmPkg.description
         url: NPM_PACKAGE_URL + '/' + pkg
         readmePreview: if isGithub npmPkg then
           await getReadmePreview npmPkg.repository.url

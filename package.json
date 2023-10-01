@@ -7,7 +7,7 @@
   },
   "devDependencies": {
     "@types/minimist": "latest",
-    "@types/remove-markdown": "^0.3.2",
+    "@types/remove-markdown": "latest",
     "bun-types": "latest",
     "pino-pretty": "latest"
   },
@@ -17,9 +17,9 @@
   "dependencies": {
     "@danielx/civet": "latest",
     "minimist": "latest",
-    "octokit": "^3.1.1",
+    "octokit": "latest",
     "pino": "latest",
-    "remove-markdown": "^0.5.0",
+    "remove-markdown": "latest",
     "undici": "latest"
   }
 }
