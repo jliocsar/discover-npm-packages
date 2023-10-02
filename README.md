@@ -1,4 +1,4 @@
-# npm-scrapper
+# discover-npm-packages
 
 To install dependencies:
 

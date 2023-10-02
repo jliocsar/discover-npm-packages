@@ -1,13 +1,16 @@
-type { TPackageNode } from ./types.civet
+YAML from yaml
+type { TPackageParent } from ./types.civet
 
-export function ascByDownloads(orig: TPackageNode, comp: TPackageNode)
+type AnyBinaryFn = (a0: any, a1: any) -> any
+
+export ascByDownloads := (orig: TPackageParent, comp: TPackageParent) ->
   comp.downloads - orig.downloads
 
-export function curry(fn: (a0?: any, a1?: any) -> any)
+export curry := (fn: AnyBinaryFn) ->
   (a0?: any) -> (a1?: any) -> fn a0, a1
 
-export function buildUrl(base: string, path: string)
-  new URL path, base |> .href
+export url := (base: string, path: string) ->
+  new URL path, base |> .toString()
 
-export writeJson := curry (fileName = 'output.json', data: TPackageNode[]) ->
-  Bun.write fileName, JSON.stringify data, null, 2
+export writeYaml := curry (fileName: string, data: TPackageParent[]) ->
+  Bun.write fileName, YAML.stringify data, {}

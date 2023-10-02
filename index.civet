@@ -5,8 +5,8 @@ pretty from pino-pretty
 minimist from minimist
 removeMd from remove-markdown
 { Octokit } from octokit
-type { TPackageNode, TPackage, TPackageDownloads } from ./types.civet
-{ buildUrl, curry, ascByDownloads, writeJson } from ./utils.civet
+type { TPackageParent, TPackage, TPackageDownloads } from ./types.civet
+{ url, curry, ascByDownloads, writeYaml } from ./utils.civet
 
 NPM_REGISTRY_URL := 'https://registry.npmjs.org'
 NPM_DOWNLOADS_API_URL := 'https://api.npmjs.org/downloads/point/last-month'
@@ -20,30 +20,30 @@ logger := pino pretty { +colorize, +singleLine }
 { _: packages, crawl: crawlCount } := minimist argv.slice(2),
   alias: { c: 'crawl' }
   default: { crawl: DEFAULT_CRAWL_LIMIT }
-adjustedCrawlCount .= crawlCount
+adjustedCrawlLimit .= crawlCount
 
-if adjustedCrawlCount > HARD_CRAWL_LIMIT
+if adjustedCrawlLimit > HARD_CRAWL_LIMIT
   logger.warn 'Crawl limit is too high! Max. is %d', HARD_CRAWL_LIMIT
   exit 1
 
-logger.info 'Running for %d packages, using crawl limit of %d', packages.length, adjustedCrawlCount
+logger.info 'Running for %d packages, using crawl limit of %d', packages.length, adjustedCrawlLimit
 
 operator fromBufferOf := Buffer.from
 
-function getNpmPackage(pkg: string)
-  fetch buildUrl NPM_REGISTRY_URL, `${pkg}/latest` |> await |> .json()
+getNpmPackage := (pkg: string) ->
+  fetch url NPM_REGISTRY_URL, `${pkg}/latest` |> await |> .json()
 
-function getNpmPackagesDownloads(pkg: string)
-  fetch buildUrl NPM_DOWNLOADS_API_URL, pkg |> await |> .json()
+getNpmPackagesDownloads := (pkg: string) ->
+  fetch url NPM_DOWNLOADS_API_URL, pkg |> await |> .json()
 
-function getReadme(owner: string, repo: string)
+getReadme := (owner: string, repo: string) ->
   octokit.rest.repos.getReadme { owner, repo }
     |> await
     |> .data.content
     |> & fromBufferOf 'base64'
     |> .toString()
 
-function getReadmePreview(repositoryUrl: string)
+getReadmePreview := (repositoryUrl: string) ->
   [owner, repo] := repositoryUrl
     |> .replace /^git:\/\/github\.com\//, ''
     |> .replace /\.git$/, ''
@@ -51,10 +51,11 @@ function getReadmePreview(repositoryUrl: string)
   getReadme owner, repo
     |> await
     |> removeMd
+    |> .replace /\n+/g, '\n'
     |> .slice 0, 1000
     |> & + '...'
 
-function isGithub(npmPkg: TPackage)
+isGithub := (npmPkg: TPackage) ->
   npmPkg.repository? and /^git:\/\/github\.com/.test npmPkg.repository.url
 
 crawlNpmPackages := curry (crawls = 0, pkgs: string[]) ->
@@ -62,25 +63,26 @@ crawlNpmPackages := curry (crawls = 0, pkgs: string[]) ->
     for pkg of pkgs
       npmPkg := (await getNpmPackage pkg) as TPackage
       npmPkgLastMonthDownloads := (await getNpmPackagesDownloads pkg) as TPackageDownloads
-      node := {
+      parent : TPackageParent := {
+        name: pkg
+        url NPM_PACKAGE_URL, pkg
         npmPkg{description}
         npmPkgLastMonthDownloads{downloads}
-        name: pkg
-        url: buildUrl NPM_PACKAGE_URL, pkg
         readmePreview: if isGithub npmPkg then await getReadmePreview npmPkg.repository.url
-        children: unless crawls is adjustedCrawlCount
+        children: unless crawls is adjustedCrawlLimit
           Object.assign {}, npmPkg.dependencies, npmPkg.devDependencies, npmPkg.peerDependencies
             |> Object.keys
             |> crawlNpmPackages crawls + 1
             |> await
             |> .sort ascByDownloads
-      } satisfies TPackageNode
-      node ||> logger.info
+      }
+      logger.info parent
+      parent
 
-function main
+main := ->
   packages
     |> crawlNpmPackages()
     |> await
-    |> writeJson 'output.json'
+    |> writeYaml 'output.yaml'
 
 await main()

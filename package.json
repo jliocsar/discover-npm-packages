@@ -1,5 +1,5 @@
 {
-  "name": "npm-scrapper",
+  "name": "discover-npm-packages",
   "module": "index.civet",
   "type": "module",
   "scripts": {
@@ -21,6 +21,7 @@
     "octokit": "latest",
     "pino": "latest",
     "remove-markdown": "latest",
-    "undici": "latest"
+    "undici": "latest",
+    "yaml": "^2.3.2"
   }
 }

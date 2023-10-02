@@ -12,10 +12,10 @@ export type TPackage
 export type TPackageDownloads
   downloads: number
 
-export type TPackageNode
+export type TPackageParent
   name: string
   description: string
   url: string
   downloads: number
   readmePreview?: string
-  children?: TPackageNode[]
+  children?: TPackageParent[]
