@@ -1,6 +1,6 @@
 # discover-npm-packages
 
-Discover new `npm`` packages based on 1+ other packages provided.
+Discover new `npm` packages based on 1+ other packages provided.
 
 This tool crawls npm + GitHub and gives you an output of the packages + readme preview sorted by downloads.
 
@@ -9,8 +9,17 @@ It's useful to find out which dependencies your packages are using, or just find
 Built with [Civet](https://civet.dev) & [Bun](https://bun.sh).
 
 > **Warning**
->
-> Make sure you setup the env. variables from `.env.example`
+> Make sure you setup your environment variables from `.env.example` before running the command!
+
+To install (🏗️ Not published yet! 🏗️):
+
+```bash
+# with npm
+npm i -g @jliocsar/discover-npm-packages
+
+# with Bun
+bun i -g @jliocsar/discover-npm-packages
+```
 
 To install dependencies:
 
@@ -21,8 +30,8 @@ bun install
 To run:
 
 ```bash
-# Use -c to define how deep it'll crawl
+# use -c to define how deep it'll crawl
 bun run start <...packages> -c 2
 ```
 
-This project was created using `bun init` in bun v1.0.3. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.
+This project was created using `bun init` in bun v1.0.3.
