@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@danielx/civet": "latest",
+    "colorette": "^2.0.20",
     "minimist": "latest",
     "octokit": "latest",
     "pino": "latest",
