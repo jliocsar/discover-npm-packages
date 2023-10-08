@@ -22,6 +22,6 @@
     "pino": "latest",
     "remove-markdown": "latest",
     "undici": "latest",
-    "yaml": "^2.3.2"
+    "yaml": "latest"
   }
 }

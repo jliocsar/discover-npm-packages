@@ -20,6 +20,11 @@ logger := pino pretty { +colorize, +singleLine }
 { _: packages, crawl: crawlCount } := minimist argv.slice(2),
   alias: { c: 'crawl' }
   default: { crawl: DEFAULT_CRAWL_LIMIT }
+
+if packages.length is 0
+  logger.warn 'No packages specified!'
+  exit 1
+
 adjustedCrawlLimit .= crawlCount
 
 if adjustedCrawlLimit > HARD_CRAWL_LIMIT
